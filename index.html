@@ -1,0 +1,484 @@
+﻿<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Absensi Exfood Pegawai</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        :root {
+            --primary-lime: #E3EF26;
+            --primary-green: #076653;
+            --dark-green: #0C342C;
+            --deep-black-green: #06231D;
+            --font-color: #0C342C;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            color: var(--font-color);
+            background-color: #f8fafc;
+        }
+        
+        .ket-input { 
+            font-size: 10px; 
+            width: 100%; 
+            text-align: center; 
+            background: transparent; 
+            border: none; 
+            border-bottom: 1px solid #cbd5e1; 
+            outline: none; 
+            color: var(--font-color); 
+        }
+
+        .bg-custom-green { background-color: var(--primary-green); }
+        .bg-custom-dark { background-color: var(--deep-black-green); }
+        .bg-custom-lime { background-color: var(--primary-lime); }
+        .text-custom-dark { color: var(--dark-green); }
+        .border-custom-green { border-color: var(--primary-green); }
+
+        @media print {
+            @page { 
+                size: a4; 
+                margin: 0.8cm; 
+            }
+            
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            
+            body { background: white !important; color: black !important; padding: 0 !important; }
+            .container { max-width: 100% !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
+            
+            table { 
+                width: 100% !important; 
+                border-collapse: collapse !important; 
+                table-layout: fixed !important; 
+                border: 1.5px solid black !important;
+                page-break-inside: auto;
+            }
+            
+            tr { 
+                page-break-inside: avoid; 
+                page-break-after: auto; 
+            }
+
+            thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
+            
+            th, td { 
+                border: 1px solid black !important; 
+                padding: 6px 2px !important; 
+                color: black !important;
+                overflow: hidden;
+            }
+
+            .col-no { width: 25px !important; }
+            /* Kolom nama dipersempit dan font diperbesar */
+            .col-nama { 
+                width: 150px !important; 
+                font-size: 11pt !important; 
+                white-space: normal !important; 
+                word-wrap: break-word !important;
+                line-height: 1.1;
+            }
+            /* Kolom hari mendapatkan ruang lebih */
+            .col-hari { width: auto !important; white-space: nowrap !important; }
+
+            input[type="checkbox"] { display: none !important; }
+            .ket-input { display: none !important; }
+            .check-print { display: inline !important; font-weight: bold; font-size: 11pt; }
+            .print-ket-text { display: block !important; font-size: 6.5pt; line-height: 1; margin-top: 1px; }
+
+            .summary-footer {
+                page-break-inside: avoid;
+                margin-top: 15px;
+            }
+
+            .signature-wrapper {
+                display: flex !important;
+                flex-direction: row !important;
+                justify-content: space-around !important;
+                align-items: flex-start !important;
+                width: 100% !important;
+                margin-top: 30px !important;
+                page-break-inside: avoid;
+            }
+            .sig-box {
+                width: 40% !important;
+                text-align: center !important;
+            }
+
+            .grand-total-box { border: 1.5px solid black !important; color: black !important; background: transparent !important; }
+        }
+
+        .print-only { display: none; }
+        .check-print { display: none; }
+        .print-ket-text { display: none; }
+        
+        #listHistory::-webkit-scrollbar { width: 5px; }
+        #listHistory::-webkit-scrollbar-thumb { background: var(--primary-green); border-radius: 10px; }
+        .history-item:hover { background-color: #f1f5f9; cursor: pointer; border-color: var(--primary-lime); }
+
+        input[type="checkbox"] {
+            accent-color: var(--primary-green);
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-10">
+
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header Cetak -->
+        <div class="print-only text-center mb-6">
+            <h1 class="text-xl font-bold uppercase underline" style="color: black;">LAPORAN ABSENSI & PEMBAYARAN EXFOOD</h1>
+            <p class="text-sm font-bold mt-1" id="printPeriodeHeader" style="color: black;">PERIODE: -</p>
+        </div>
+
+        <!-- Panel Navigasi -->
+        <div class="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-200 no-print">
+            <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-custom-dark">Sistem Absensi Exfood</h2>
+                    <p class="text-sm text-gray-500">Kelola kehadiran & biaya makan harian</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="exportData()" class="bg-custom-dark text-white px-3 py-2 rounded-lg hover:opacity-90 text-xs font-medium flex items-center">
+                        Backup JSON
+                    </button>
+                    <label class="bg-custom-dark text-white px-3 py-2 rounded-lg hover:opacity-90 text-xs font-medium flex items-center cursor-pointer">
+                        Restore
+                        <input type="file" id="importFile" class="hidden" accept=".json" onchange="importData(event)">
+                    </label>
+                    <button onclick="simpanKeRiwayat()" class="bg-custom-green text-white px-4 py-2 rounded-lg hover:opacity-90 text-sm font-medium flex items-center shadow-md">
+                        Simpan Data
+                    </button>
+                    <button onclick="tambahPegawai()" class="bg-custom-dark text-white px-4 py-2 rounded-lg hover:opacity-90 text-sm font-medium">+ Pegawai</button>
+                    <button onclick="window.print()" class="bg-custom-lime text-custom-dark px-4 py-2 rounded-lg hover:opacity-90 text-sm font-bold flex items-center">
+                        Cetak Laporan
+                    </button>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Periode Minggu</label>
+                            <input type="text" id="periode" placeholder="Contoh: 12-16 Mei" oninput="updatePrintHeader()" class="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-custom-green text-custom-dark font-medium">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nominal (Rp/Hari)</label>
+                            <input type="number" id="nominalExfood" value="20000" oninput="hitungSemua()" class="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-custom-green text-custom-dark font-medium">
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="text" id="namaPegawaiBaru" placeholder="Tambah nama pegawai..." onkeypress="if(event.key==='Enter') tambahPegawai()" class="flex-1 px-3 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-custom-green text-custom-dark font-medium">
+                        <button onclick="resetTabel()" class="text-[10px] font-bold text-red-600 border border-red-100 px-3 rounded-lg hover:bg-red-50 transition-colors">KOSONGKAN TABEL</button>
+                    </div>
+                </div>
+                <div class="border-l pl-6 border-gray-100">
+                    <h3 class="text-[10px] font-bold text-gray-400 uppercase mb-2">Riwayat (Klik untuk Edit)</h3>
+                    <div id="listHistory" class="space-y-2 max-h-36 overflow-y-auto pr-2"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabel Utama -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200 print:border-none">
+            <table class="w-full">
+                <thead>
+                    <tr class="bg-custom-green text-white uppercase text-[10px] font-bold print:bg-gray-100 print:text-black">
+                        <th class="p-3 text-center col-no">No</th>
+                        <th class="p-3 text-left col-nama">Nama Pegawai</th>
+                        <th class="p-3 text-center col-hari">Senin</th>
+                        <th class="p-3 text-center col-hari">Selasa</th>
+                        <th class="p-3 text-center col-hari">Rabu</th>
+                        <th class="p-3 text-center col-hari">Kamis</th>
+                        <th class="p-3 text-center col-hari">Jumat</th>
+                        <th class="p-3 w-10 no-print"></th>
+                    </tr>
+                </thead>
+                <tbody id="bodyTabel" class="text-[11px] print:text-[10px]">
+                    <!-- Data diisi JS -->
+                </tbody>
+                <tfoot class="bg-slate-50 font-bold print:bg-transparent">
+                    <tr class="text-custom-dark">
+                        <td colspan="2" class="p-3 text-right border-t">TOTAL HADIR</td>
+                        <td class="p-3 text-center border-t col-hari" id="hadir-1">0</td>
+                        <td class="p-3 text-center border-t col-hari" id="hadir-2">0</td>
+                        <td class="p-3 text-center border-t col-hari" id="hadir-3">0</td>
+                        <td class="p-3 text-center border-t col-hari" id="hadir-4">0</td>
+                        <td class="p-3 text-center border-t col-hari" id="hadir-5">0</td>
+                        <td class="no-print border-t"></td>
+                    </tr>
+                    <tr class="text-custom-green print:text-black">
+                        <td colspan="2" class="p-3 text-right">TOTAL (Rp)</td>
+                        <td class="p-3 text-center col-hari" id="sub-1">0</td>
+                        <td class="p-3 text-center col-hari" id="sub-2">0</td>
+                        <td class="p-3 text-center col-hari" id="sub-3">0</td>
+                        <td class="p-3 text-center col-hari" id="sub-4">0</td>
+                        <td class="p-3 text-center col-hari" id="sub-5">0</td>
+                        <td class="no-print"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <div class="summary-footer">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 items-start">
+                <!-- Catatan -->
+                <div class="p-5 border border-gray-200 rounded-xl bg-white print:border-none print:p-0">
+                    <h3 class="font-bold text-xs uppercase mb-3 underline text-custom-dark">Catatan Tidak Hadir:</h3>
+                    <div id="ringkasanTidakHadir" class="text-[11px] space-y-1.5"></div>
+                </div>
+                
+                <!-- Grand Total -->
+                <div class="bg-custom-dark text-white p-7 rounded-2xl text-center shadow-xl grand-total-box print:text-black print:p-4 print:shadow-none">
+                    <p class="text-[10px] uppercase font-bold tracking-widest opacity-70 mb-2">Grand Total Dana Minggu Ini</p>
+                    <h2 class="text-4xl font-extrabold text-custom-lime print:text-black" id="grandTotal">Rp 0</h2>
+                    <div class="mt-5 pt-4 border-t border-custom-green flex justify-between text-[9px] uppercase print:border-black">
+                        <span>Jumlah Pegawai: <span id="countPegawai" class="font-bold">0</span></span>
+                        <span id="tglCetak"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bagian Tanda Tangan -->
+            <div class="print-only signature-wrapper">
+                <div class="sig-box">
+                    <p class="mb-20 font-bold">DIBUAT OLEH,</p>
+                    <p class="border-t border-black pt-2 mx-10 text-xs font-bold uppercase">( Administrasi )</p>
+                </div>
+                <div class="sig-box">
+                    <p class="mb-20 font-bold">DISETUJUI OLEH,</p>
+                    <p class="border-t border-black pt-2 mx-10 text-xs font-bold uppercase">( Manager Operasional )</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data State
+        let daftarPegawai = ["Budi Santoso", "Siti Aminah", "Joko Widodo", "Lestari", "Andi Pratama"];
+        let kehadiran = {};
+        let keterangan = {};
+        let historyData = [];
+
+        function init() {
+            const saved = localStorage.getItem('exfood_history_v9');
+            if (saved) historyData = JSON.parse(saved);
+            document.getElementById('tglCetak').innerText = new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'});
+            renderTabel();
+            renderHistory();
+            hitungSemua();
+        }
+
+        function renderTabel() {
+            const body = document.getElementById('bodyTabel');
+            body.innerHTML = '';
+            daftarPegawai.forEach((nama, pIdx) => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-gray-100 hover:bg-slate-50 transition-colors";
+                let cells = `
+                    <td class="p-3 text-center col-no font-medium text-gray-400">${pIdx+1}</td>
+                    <td class="p-3 font-bold col-nama text-custom-dark">${nama}</td>
+                `;
+                for (let h=1; h<=5; h++) {
+                    const key = `${pIdx}-${h}`;
+                    const isHadir = kehadiran[key] !== false;
+                    const valKet = keterangan[key] || "";
+                    cells += `
+                        <td class="p-2 text-center col-hari border-l border-slate-50">
+                            <div class="flex flex-col items-center">
+                                <input type="checkbox" class="no-print w-4 h-4 cursor-pointer" ${isHadir?'checked':''} 
+                                    onchange="kehadiran['${key}']=this.checked; hitungSemua();">
+                                <span class="check-print text-xl">${isHadir ? '✔' : '-'}</span>
+                                <input type="text" class="ket-input no-print mt-1 focus:border-custom-lime" placeholder="..." value="${valKet}" 
+                                    oninput="keterangan['${key}']=this.value; updateRingkasan();">
+                                <span class="print-ket-text italic font-medium">${valKet}</span>
+                            </div>
+                        </td>`;
+                }
+                cells += `<td class="p-3 no-print text-center"><button onclick="hapusPegawai(${pIdx})" class="text-red-300 hover:text-red-600 font-bold transition-colors">Hapus</button></td>`;
+                tr.innerHTML = cells;
+                body.appendChild(tr);
+            });
+            document.getElementById('countPegawai').innerText = daftarPegawai.length;
+            updateRingkasan();
+        }
+
+        function hitungSemua() {
+            const nominal = parseInt(document.getElementById('nominalExfood').value) || 0;
+            let totalHadir = [0,0,0,0,0];
+            daftarPegawai.forEach((_, pIdx) => {
+                for (let h=1; h<=5; h++) {
+                    if (kehadiran[`${pIdx}-${h}`] !== false) totalHadir[h-1]++;
+                }
+            });
+            let grand = 0;
+            totalHadir.forEach((jml, i) => {
+                const sub = jml * nominal;
+                grand += sub;
+                document.getElementById(`hadir-${i+1}`).innerText = jml;
+                document.getElementById(`sub-${i+1}`).innerText = sub.toLocaleString('id-ID');
+            });
+            document.getElementById('grandTotal').innerText = "Rp " + grand.toLocaleString('id-ID');
+            updateRingkasan();
+        }
+
+        function updateRingkasan() {
+            const hari = ["", "Senin", "Selasa", "Rabu", "Kamis", "Jumat"];
+            let html = '';
+            for (let h=1; h<=5; h++) {
+                let absen = [];
+                daftarPegawai.forEach((nama, pIdx) => {
+                    if (kehadiran[`${pIdx}-${h}`] === false) {
+                        let k = keterangan[`${pIdx}-${h}`] ? ` (${keterangan[`${pIdx}-${h}`]})` : "";
+                        absen.push(`<span class="font-bold">${nama}</span>${k}`);
+                    }
+                });
+                if (absen.length > 0) html += `<p class="flex items-start"><span class="w-20 font-bold text-custom-green">${hari[h]}:</span> <span class="flex-1">${absen.join(', ')}</span></p>`;
+            }
+            document.getElementById('ringkasanTidakHadir').innerHTML = html || '<p class="italic text-gray-400">Semua pegawai hadir penuh.</p>';
+        }
+
+        function tambahPegawai() {
+            const input = document.getElementById('namaPegawaiBaru');
+            if (input.value.trim()) { 
+                daftarPegawai.push(input.value.trim()); 
+                input.value=''; 
+                renderTabel(); 
+                hitungSemua(); 
+            }
+        }
+
+        function hapusPegawai(i) { 
+            if(confirm('Hapus pegawai ini dari daftar?')) { 
+                daftarPegawai.splice(i,1); 
+                renderTabel(); 
+                hitungSemua(); 
+            } 
+        }
+        
+        function updatePrintHeader() { 
+            document.getElementById('printPeriodeHeader').innerText = "PERIODE: " + (document.getElementById('periode').value.toUpperCase() || "-"); 
+        }
+
+        function simpanKeRiwayat() {
+            const per = document.getElementById('periode').value.trim();
+            if (!per) return alert('Mohon isi periode minggu dahulu!');
+            
+            const dataSave = {
+                id: Date.now(),
+                periode: per,
+                nominal: document.getElementById('nominalExfood').value,
+                pegawai: [...daftarPegawai],
+                kehadiran: {...kehadiran},
+                keterangan: {...keterangan},
+                total: document.getElementById('grandTotal').innerText,
+                tglSave: new Date().toLocaleString('id-ID')
+            };
+
+            const existingIdx = historyData.findIndex(h => h.periode.toLowerCase() === per.toLowerCase());
+            if (existingIdx !== -1) {
+                if(confirm('Periode "' + per + '" sudah ada. Update data lama?')) {
+                    historyData[existingIdx] = dataSave;
+                } else { return; }
+            } else {
+                historyData.unshift(dataSave);
+            }
+
+            localStorage.setItem('exfood_history_v9', JSON.stringify(historyData));
+            renderHistory();
+            alert('Data berhasil disimpan ke riwayat.');
+        }
+
+        function renderHistory() {
+            const list = document.getElementById('listHistory');
+            if(historyData.length === 0) {
+                list.innerHTML = '<p class="text-[10px] text-gray-400 italic">Belum ada riwayat tersimpan.</p>';
+                return;
+            }
+            list.innerHTML = historyData.map(h => `
+                <div class="history-item flex justify-between items-center bg-white p-3 rounded-xl border border-gray-100 mb-2 shadow-sm transition-all border-l-4 border-l-custom-green">
+                    <div class="flex-1" onclick="loadRiwayat(${h.id})" title="Klik untuk edit data periode ini">
+                        <span class="font-bold text-custom-dark uppercase text-[10px] block tracking-wide">${h.periode}</span>
+                        <span class="text-[9px] text-gray-500">${h.tglSave} • <span class="text-custom-green font-bold">${h.total}</span></span>
+                    </div>
+                    <div class="flex space-x-2 no-print ml-3">
+                        <button onclick="hapusHist(${h.id})" class="text-red-400 hover:text-red-600 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function loadRiwayat(id) {
+            const data = historyData.find(h => h.id === id);
+            if (!data) return;
+            
+            if(confirm('Muat data periode ' + data.periode + '? Data di tabel saat ini akan diganti.')) {
+                document.getElementById('periode').value = data.periode;
+                document.getElementById('nominalExfood').value = data.nominal || 20000;
+                daftarPegawai = [...data.pegawai];
+                kehadiran = {...data.kehadiran};
+                keterangan = {...data.keterangan};
+                
+                updatePrintHeader();
+                renderTabel();
+                hitungSemua();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        function hapusHist(id) { 
+            if(confirm('Hapus riwayat ini?')) {
+                historyData = historyData.filter(x=>x.id!==id); 
+                localStorage.setItem('exfood_history_v9', JSON.stringify(historyData)); 
+                renderHistory(); 
+            }
+        }
+
+        function resetTabel() {
+            if(confirm('Kosongkan semua data?')) {
+                daftarPegawai = []; kehadiran = {}; keterangan = {};
+                document.getElementById('periode').value = '';
+                renderTabel(); hitungSemua();
+            }
+        }
+
+        function exportData() {
+            const data = { v: "9.0", history: historyData };
+            const blob = new Blob([JSON.stringify(data)], {type: 'application/json'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `backup_exfood_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (imported.history) {
+                        if(confirm('Impor ' + imported.history.length + ' data? Data lama tidak akan dihapus.')) {
+                            const existingIds = historyData.map(h => h.id);
+                            imported.history.forEach(h => { if (!existingIds.includes(h.id)) historyData.push(h); });
+                            localStorage.setItem('exfood_history_v9', JSON.stringify(historyData));
+                            renderHistory();
+                        }
+                    }
+                } catch(err) { alert('File rusak atau tidak valid!'); }
+            };
+            reader.readAsText(file);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
